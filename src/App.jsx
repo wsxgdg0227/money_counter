@@ -213,10 +213,50 @@ function App() {
     setRecords((prev) => prev.filter((r) => r.id !== id))
   }
 
+  const handleExport = () => {
+    const data = localStorage.getItem(STORAGE_KEY)
+    if (!data) {
+      alert('No data to export')
+      return
+    }
+    navigator.clipboard.writeText(data).then(() => {
+      alert('Data copied to clipboard! Open the new site and click "Import Data" to paste it.')
+    })
+  }
+
+  const handleImport = async () => {
+    try {
+      const text = await navigator.clipboard.readText()
+      if (!text) return
+      JSON.parse(text) // Validate JSON
+      localStorage.setItem(STORAGE_KEY, text)
+      setRecords(JSON.parse(text))
+      alert('Data imported successfully!')
+    } catch (err) {
+      alert('Failed to import data. Make sure you copied valid data from the old site.')
+    }
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800">
       <div className="mx-auto max-w-[1600px] px-6 py-6">
-        <h1 className="mb-6 text-2xl font-bold">Personal Bookkeeping Dashboard</h1>
+        <div className="mb-6 flex items-center justify-between">
+          <h1 className="text-2xl font-bold">Personal Bookkeeping Dashboard</h1>
+          <div className="space-x-4">
+            <button
+              onClick={handleExport}
+              className="rounded border border-slate-300 bg-white px-3 py-1 text-sm hover:bg-slate-50"
+            >
+              Export Data (Copy)
+            </button>
+            <button
+              onClick={handleImport}
+              className="rounded border border-slate-300 bg-white px-3 py-1 text-sm hover:bg-slate-50"
+            >
+              Import Data (Paste)
+            </button>
+          </div>
+        </div>
 
         <section className="mb-6 grid grid-cols-3 gap-4">
           <KpiCard title="Monthly Income" value={formatMoney(kpi.monthIncome)} color="text-emerald-600" />
