@@ -34,6 +34,7 @@ function App() {
   const [records, setRecords] = useState([])
   const [form, setForm] = useState(emptyForm)
   const [trendMode, setTrendMode] = useState('bar')
+  const [showPiePercent, setShowPiePercent] = useState(false)
 
   /**
    * Initialize records from LocalStorage on first render.
@@ -129,6 +130,10 @@ function App() {
 
     return Object.entries(grouped).map(([name, value]) => ({ name, value }))
   }, [records])
+
+  const totalExpenseValue = useMemo(() => {
+    return expensePieData.reduce((sum, item) => sum + item.value, 0)
+  }, [expensePieData])
 
   /**
    * Last-7-days trend transformation for Bar/Line charts:
@@ -269,7 +274,7 @@ function App() {
             <div className="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
               <h2 className="mb-4 text-lg font-semibold">Add Transaction</h2>
               <form onSubmit={handleSubmit} className="grid grid-cols-12 gap-4">
-                <div className="col-span-3">
+                <div className="col-span-2">
                   <label className="mb-1 block text-sm text-slate-600">Amount</label>
                   <input
                     type="number"
@@ -285,22 +290,22 @@ function App() {
 
                 <div className="col-span-3">
                   <label className="mb-1 block text-sm text-slate-600">Type</label>
-                  <div className="flex h-[42px] items-center gap-4 rounded-lg border border-slate-300 px-3">
-                    <label className="inline-flex items-center gap-1 text-sm">
+                  <div className="grid h-[42px] grid-cols-2 items-center gap-2 rounded-lg border border-slate-300 px-2">
+                    <label className="inline-flex min-w-0 items-center justify-center gap-1 overflow-hidden rounded-md border border-slate-200 px-2 py-1 text-xs xl:text-sm">
                       <input
                         type="radio"
                         checked={form.type === 'expense'}
                         onChange={() => handleTypeChange('expense')}
                       />
-                      Expense
+                      <span className="truncate">Expense</span>
                     </label>
-                    <label className="inline-flex items-center gap-1 text-sm">
+                    <label className="inline-flex min-w-0 items-center justify-center gap-1 overflow-hidden rounded-md border border-slate-200 px-2 py-1 text-xs xl:text-sm">
                       <input
                         type="radio"
                         checked={form.type === 'income'}
                         onChange={() => handleTypeChange('income')}
                       />
-                      Income
+                      <span className="truncate">Income</span>
                     </label>
                   </div>
                 </div>
@@ -320,7 +325,7 @@ function App() {
                   </select>
                 </div>
 
-                <div className="col-span-2">
+                <div className="col-span-3">
                   <label className="mb-1 block text-sm text-slate-600">Date</label>
                   <input
                     type="date"
@@ -408,16 +413,40 @@ function App() {
 
           <div className="col-span-5 space-y-6">
             <div className="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
-              <h2 className="mb-4 text-lg font-semibold">Expense Breakdown (Pie Chart)</h2>
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="text-lg font-semibold">Expense Breakdown (Pie Chart)</h2>
+                <button
+                  className="rounded border border-slate-300 px-3 py-1 text-sm hover:bg-slate-100"
+                  onClick={() => setShowPiePercent((prev) => !prev)}
+                >
+                  {showPiePercent ? 'Show Amount' : 'Show Percent'}
+                </button>
+              </div>
               <div className="h-[320px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie data={expensePieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label>
+                    <Pie
+                      data={expensePieData}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={100}
+                      label={({ name, percent, value }) =>
+                        showPiePercent ? `${name}: ${(percent * 100).toFixed(1)}%` : `${name}: ${formatMoney(value)}`
+                      }
+                    >
                       {expensePieData.map((item, index) => (
                         <Cell key={item.name} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(v) => formatMoney(v)} />
+                    <Tooltip
+                      formatter={(v) =>
+                        showPiePercent && totalExpenseValue > 0
+                          ? `${((Number(v) / totalExpenseValue) * 100).toFixed(1)}%`
+                          : formatMoney(Number(v))
+                      }
+                    />
                     <Legend />
                   </PieChart>
                 </ResponsiveContainer>
