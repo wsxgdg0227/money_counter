@@ -21,12 +21,41 @@ const EXPENSE_CATEGORIES = ['Food', 'Transport', 'Housing', 'Shopping', 'Enterta
 const INCOME_CATEGORIES = ['Salary', 'Part-time', 'Investment', 'Bonus', 'Other']
 
 const PIE_COLORS = ['#3B82F6', '#22C55E', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4', '#F97316', '#14B8A6']
+const BEIJING_TIME_ZONE = 'Asia/Shanghai'
+
+const getBeijingDateParts = (date) => {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: BEIJING_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(date)
+
+  const year = parts.find((part) => part.type === 'year')?.value ?? ''
+  const month = parts.find((part) => part.type === 'month')?.value ?? ''
+  const day = parts.find((part) => part.type === 'day')?.value ?? ''
+  return { year, month, day }
+}
+
+const getBeijingDateString = (date) => {
+  const { year, month, day } = getBeijingDateParts(date)
+  return `${year}-${month}-${day}`
+}
+
+const shiftYmd = (ymd, deltaDays) => {
+  const [year, month, day] = ymd.split('-').map(Number)
+  const shifted = new Date(Date.UTC(year, month - 1, day + deltaDays))
+  const y = shifted.getUTCFullYear()
+  const m = String(shifted.getUTCMonth() + 1).padStart(2, '0')
+  const d = String(shifted.getUTCDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
 
 const emptyForm = {
   amount: '',
   type: 'expense',
   category: 'Food',
-  date: new Date().toISOString().slice(0, 10),
+  date: getBeijingDateString(new Date()),
   note: ''
 }
 
@@ -87,8 +116,7 @@ function App() {
    * - Current balance (all-time income - all-time expense)
    */
   const kpi = useMemo(() => {
-    const now = new Date()
-    const currentYM = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    const currentYM = getBeijingDateString(new Date()).slice(0, 7)
 
     const currentMonthRecords = records.filter((r) => r.date.startsWith(currentYM))
 
@@ -144,14 +172,11 @@ function App() {
   const trend7DaysData = useMemo(() => {
     const days = []
     const dateMap = new Map()
+    const todayYmd = getBeijingDateString(new Date())
 
     for (let i = 6; i >= 0; i--) {
-      const d = new Date()
-      d.setHours(0, 0, 0, 0)
-      d.setDate(d.getDate() - i)
-
-      const isoDate = d.toISOString().slice(0, 10)
-      const label = `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      const isoDate = shiftYmd(todayYmd, -i)
+      const label = isoDate.slice(5)
 
       const item = { date: label, income: 0, expense: 0, isoDate }
       days.push(item)
@@ -210,7 +235,7 @@ function App() {
       ...emptyForm,
       type: prev.type,
       category: prev.type === 'expense' ? EXPENSE_CATEGORIES[0] : INCOME_CATEGORIES[0],
-      date: new Date().toISOString().slice(0, 10)
+      date: getBeijingDateString(new Date())
     }))
   }
 
@@ -393,7 +418,7 @@ function App() {
                             {r.type === 'income' ? '+' : '-'}
                             {formatMoney(r.amount)}
                           </td>
-                          <td className="border-b border-slate-100 px-3 py-2">{r.note || '¡ª'}</td>
+                          <td className="border-b border-slate-100 px-3 py-2">{r.note || '??'}</td>
                           <td className="border-b border-slate-100 px-3 py-2 text-center">
                             <button
                               className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-100"
