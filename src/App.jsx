@@ -18,7 +18,7 @@ import {
 const STORAGE_KEY = 'bookkeeping_records_v1'
 
 const EXPENSE_CATEGORIES = ['Food', 'Transport', 'Housing', 'Shopping', 'Entertainment', 'Medical', 'Education', 'Other']
-const INCOME_CATEGORIES = ['Salary', 'Part-time', 'Investment', 'Bonus', 'Other']
+const INCOME_CATEGORIES = ['Salary', 'Part-time', 'Investment', 'Bonus', 'Transfer', 'Other']
 
 const PIE_COLORS = ['#3B82F6', '#22C55E', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4', '#F97316', '#14B8A6']
 const BEIJING_TIME_ZONE = 'Asia/Shanghai'
@@ -109,6 +109,30 @@ function App() {
     })
   }, [records])
 
+  const groupedRecords = useMemo(() => {
+    const groups = []
+    let currentDate = ''
+    let currentItems = []
+
+    for (const record of sortedRecords) {
+      if (record.date !== currentDate) {
+        if (currentItems.length > 0) {
+          groups.push({ date: currentDate, items: currentItems })
+        }
+        currentDate = record.date
+        currentItems = [record]
+      } else {
+        currentItems.push(record)
+      }
+    }
+
+    if (currentItems.length > 0) {
+      groups.push({ date: currentDate, items: currentItems })
+    }
+
+    return groups
+  }, [sortedRecords])
+
   /**
    * KPI:
    * - Monthly income
@@ -139,6 +163,14 @@ function App() {
     const balance = totalIncome - totalExpense
 
     return { monthIncome, monthExpense, balance }
+  }, [records])
+
+  const monthExpenseRanking = useMemo(() => {
+    const currentYM = getBeijingDateString(new Date()).slice(0, 7)
+    return records
+      .filter((r) => r.type === 'expense' && r.date.startsWith(currentYM))
+      .sort((a, b) => Number(b.amount) - Number(a.amount))
+      .slice(0, 10)
   }, [records])
 
   /**
@@ -384,59 +416,81 @@ function App() {
             </div>
 
             <div className="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
-              <h2 className="mb-4 text-lg font-semibold">Transaction History (Newest First)</h2>
-              <div className="max-h-[430px] overflow-auto">
-                <table className="w-full border-collapse text-sm">
-                  <thead className="sticky top-0 bg-slate-100">
-                    <tr>
-                      <th className="border-b border-slate-200 px-3 py-2 text-left">Date</th>
-                      <th className="border-b border-slate-200 px-3 py-2 text-left">Type</th>
-                      <th className="border-b border-slate-200 px-3 py-2 text-left">Category</th>
-                      <th className="border-b border-slate-200 px-3 py-2 text-right">Amount</th>
-                      <th className="border-b border-slate-200 px-3 py-2 text-left">Note</th>
-                      <th className="border-b border-slate-200 px-3 py-2 text-center">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sortedRecords.length === 0 ? (
-                      <tr>
-                        <td className="px-3 py-6 text-center text-slate-500" colSpan={6}>
-                          No data yet. Please add your first transaction.
-                        </td>
-                      </tr>
-                    ) : (
-                      sortedRecords.map((r) => (
-                        <tr key={r.id} className="hover:bg-slate-50">
-                          <td className="border-b border-slate-100 px-3 py-2">{r.date}</td>
-                          <td className="border-b border-slate-100 px-3 py-2">
-                            <span className={r.type === 'income' ? 'text-emerald-600' : 'text-rose-600'}>
-                              {r.type === 'income' ? 'Income' : 'Expense'}
-                            </span>
-                          </td>
-                          <td className="border-b border-slate-100 px-3 py-2">{r.category}</td>
-                          <td className="border-b border-slate-100 px-3 py-2 text-right">
-                            {r.type === 'income' ? '+' : '-'}
-                            {formatMoney(r.amount)}
-                          </td>
-                          <td className="border-b border-slate-100 px-3 py-2">{r.note || '??'}</td>
-                          <td className="border-b border-slate-100 px-3 py-2 text-center">
-                            <button
-                              className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-100"
-                              onClick={() => handleDelete(r.id)}
-                            >
-                              Delete
-                            </button>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+              <h2 className="mb-4 text-lg font-semibold">Transaction History</h2>
+              <div className="max-h-[500px] space-y-4 overflow-auto pr-1">
+                {groupedRecords.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-slate-300 py-10 text-center text-sm text-slate-500">
+                    No data yet. Please add your first transaction.
+                  </div>
+                ) : (
+                  groupedRecords.map((group) => (
+                    <div key={group.date} className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50/70">
+                      <div className="border-b border-slate-200 px-4 py-2 text-sm font-medium text-slate-700">{group.date}</div>
+                      <div className="divide-y divide-slate-100 bg-white">
+                        {group.items.map((r) => (
+                          <div key={r.id} className="grid grid-cols-12 items-center gap-3 px-4 py-3 transition hover:bg-slate-50">
+                            <div className="col-span-7 min-w-0">
+                              <div className="mb-1 flex items-center gap-2">
+                                <span className={r.type === 'income' ? 'text-xs font-medium text-emerald-600' : 'text-xs font-medium text-rose-600'}>
+                                  {r.type === 'income' ? 'Income' : 'Expense'}
+                                </span>
+                                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">{r.category}</span>
+                              </div>
+                              <div className="truncate text-sm text-slate-500">{r.note || 'No note'}</div>
+                            </div>
+                            <div className={`col-span-3 text-right text-base font-semibold ${r.type === 'income' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                              {r.type === 'income' ? '+' : '-'}
+                              {formatMoney(r.amount)}
+                            </div>
+                            <div className="col-span-2 text-right">
+                              <button
+                                className="rounded-lg border border-slate-200 px-3 py-1 text-xs text-slate-500 transition hover:border-slate-300 hover:bg-slate-100 hover:text-slate-700"
+                                onClick={() => handleDelete(r.id)}
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </div>
 
           <div className="col-span-5 space-y-6">
+            <div className="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="text-lg font-semibold">Monthly Expense Ranking</h2>
+                <span className="rounded-full bg-rose-50 px-2.5 py-1 text-xs font-medium text-rose-600">
+                  {getBeijingDateString(new Date()).slice(0, 7)}
+                </span>
+              </div>
+              <div className="space-y-2">
+                {monthExpenseRanking.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-slate-300 py-8 text-center text-sm text-slate-500">
+                    No expense records this month.
+                  </div>
+                ) : (
+                  monthExpenseRanking.map((item, index) => (
+                    <div key={item.id} className="grid grid-cols-12 items-center rounded-lg border border-slate-100 px-3 py-2.5 hover:bg-slate-50">
+                      <div className="col-span-1 text-sm font-semibold text-slate-400">#{index + 1}</div>
+                      <div className="col-span-7 min-w-0">
+                        <div className="mb-1 flex items-center gap-2">
+                          <span className="text-xs font-medium text-rose-600">Expense</span>
+                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">{item.category}</span>
+                        </div>
+                        <div className="truncate text-xs text-slate-500">{item.note || 'No note'}</div>
+                      </div>
+                      <div className="col-span-4 text-right text-sm font-semibold text-rose-600">{formatMoney(item.amount)}</div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
             <div className="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
               <div className="mb-4 flex items-center justify-between">
                 <h2 className="text-lg font-semibold">Expense Breakdown (Pie Chart)</h2>
